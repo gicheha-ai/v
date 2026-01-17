@@ -7,7 +7,7 @@ from flask import Flask, render_template, jsonify
 import requests
 import pandas as pd
 import numpy as np
-import TA-Lib 
+import talib 
 from datetime import datetime, timedelta
 import json
 import os
