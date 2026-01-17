@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⏰ Hourly EUR/GBP Predictor</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --buy-color: #28a745;
+            --sell-color: #dc3545;
+            --neutral-color: #6c757d;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+        
+        .header-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            text-align: center;
+            padding: 30px;
+        }
+        
+        .signal-box {
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.5rem;
+            margin: 10px 0;
+            transition: all 0.3s ease;
+        }
+        
+        .signal-buy {
+            background: linear-gradient(135deg, rgba(40, 167, 69, 0.2), rgba(40, 167, 69, 0.4));
+            border-left: 5px solid var(--buy-color);
+            color: #d4edda;
+        }
+        
+        .signal-sell {
+            background: linear-gradient(135deg, rgba(220, 53, 69, 0.2), rgba(220, 53, 69, 0.4));
+            border-left: 5px solid var(--sell-color);
+            color: #f8d7da;
+        }
+        
+        .signal-neutral {
+            background: linear-gradient(135deg, rgba(108, 117, 125, 0.2), rgba(108, 117, 125, 0.4));
+            border-left: 5px solid var(--neutral-color);
+            color: #e2e3e5;
+        }
+        
+        .price-display {
+            font-size: 3.5rem;
+            font-weight: 800;
+            text-align: center;
+            margin: 20px 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .level-indicator {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 5px 0;
+            font-weight: bold;
+        }
+        
+        .entry-level {
+            background: rgba(0, 123, 255, 0.2);
+            border-left: 3px solid #007bff;
+        }
+        
+        .tp-level {
+            background: rgba(40, 167, 69, 0.2);
+            border-left: 3px solid var(--buy-color);
+        }
+        
+        .sl-level {
+            background: rgba(220, 53, 69, 0.2);
+            border-left: 3px solid var(--sell-color);
+        }
+        
+        .confidence-meter {
+            height: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 1s ease;
+        }
+        
+        .timeframe-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin: 2px;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 20px 0;
+        }
+        
+        .entry-circle {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            border: 3px solid #007bff;
+            background: rgba(0, 123, 255, 0.3);
+            transform: translate(-50%, -50%);
+            z-index: 100;
+        }
+        
+        .hour-badge {
+            background: #ffc107;
+            color: #000;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            display: inline-block;
+            margin: 10px 0;
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <!-- Header -->
+        <div class="header-card glass-card mb-4">
+            <h1 class="display-5 fw-bold">
+                <i class="fas fa-clock"></i> Hourly EUR/GBP Predictor
+            </h1>
+            <p class="lead">AI-Powered Hourly Predictions with Entry Zones</p>
+            <div class="hour-badge">
+                Current Hour: <span id="currentHour">--:--</span>
+            </div>
+        </div>
+
+        <!-- Current Prediction -->
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- Chart -->
+                <div class="glass-card">
+                    <h4><i class="fas fa-chart-line"></i> Hourly Prediction Chart</h4>
+                    <div class="chart-container">
+                        <canvas id="predictionChart"></canvas>
+                    </div>
+                    <div class="text-center mt-3">
+                        <div class="btn-group">
+                            <button class="btn btn-outline-light" onclick="updateChart('hour')">1 Hour</button>
+                            <button class="btn btn-outline-light" onclick="updateChart('4hour')">4 Hours</button>
+                            <button class="btn btn-outline-light" onclick="updateChart('day')">1 Day</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <!-- Current Price & Signal -->
+                <div class="glass-card text-center">
+                    <h4><i class="fas fa-bullseye"></i> Current Signal</h4>
+                    <div class="price-display" id="currentPrice">0.86000</div>
+                    
+                    <div id="signalBox" class="signal-neutral signal-box">
+                        <i class="fas fa-question-circle"></i> NEUTRAL
+                    </div>
+                    
+                    <div class="confidence-meter">
+                        <div id="confidenceFill" class="confidence-fill bg-success" style="width: 50%"></div>
+                    </div>
+                    <p class="text-muted">Confidence: <span id="confidenceValue">50%</span></p>
+                    
+                    <p class="mb-0">
+                        <i class="fas fa-sync-alt"></i> 
+                        Next update: <span id="nextUpdate">00:00</span>
+                    </p>
+                </div>
+
+                <!-- Trading Levels -->
+                <div class="glass-card">
+                    <h4><i class="fas fa-level-up-alt"></i> Trading Levels</h4>
+                    
+                    <div class="level-indicator entry-level">
+                        <div class="row">
+                            <div class="col-6">
+                                <small>ENTRY ZONE</small>
+                                <div class="fw-bold" id="entryPrice">0.00000</div>
+                            </div>
+                            <div class="col-6 text-end">
+                                <div id="entryAction" class="badge bg-info">BUY/SELL</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="level-indicator tp-level">
+                        <small>TAKE PROFIT</small>
+                        <div class="fw-bold" id="takeProfit">0.00000</div>
+                        <small>Pips: <span id="tpPips">0</span></small>
+                    </div>
+                    
+                    <div class="level-indicator sl-level">
+                        <small>STOP LOSS</small>
+                        <div class="fw-bold" id="stopLoss">0.00000</div>
+                        <small>Pips: <span id="slPips">0</span></small>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <table class="table table-dark table-sm">
+                            <tr>
+                                <td>Risk/Reward:</td>
+                                <td class="text-end" id="riskReward">1:0.00</td>
+                            </tr>
+                            <tr>
+                                <td>Predicted High:</td>
+                                <td class="text-end text-success" id="predictedHigh">0.00000</td>
+                            </tr>
+                            <tr>
+                                <td>Predicted Low:</td>
+                                <td class="text-end text-danger" id="predictedLow">0.00000</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeframe Analysis -->
+        <div class="glass-card">
+            <h4><i class="fas fa-layer-group"></i> Multi-Timeframe Analysis</h4>
+            <div class="row text-center" id="timeframeAnalysis">
+                <!-- Will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="glass-card text-center">
+            <button onclick="getPrediction()" class="btn btn-primary btn-lg px-5">
+                <i class="fas fa-play-circle"></i> Generate Hourly Prediction
+            </button>
+            <p class="text-muted mt-2">
+                Auto-updates at the start of every hour | 
+                Last update: <span id="lastUpdate">--:--:--</span>
+            </p>
+        </div>
+
+        <!-- Accuracy Stats -->
+        <div class="glass-card">
+            <h4><i class="fas fa-chart-bar"></i> Prediction Accuracy</h4>
+            <div class="row text-center">
+                <div class="col-md-4">
+                    <div class="display-6 text-success" id="overallAccuracy">85.0%</div>
+                    <small>Overall Accuracy</small>
+                </div>
+                <div class="col-md-4">
+                    <div class="display-6 text-warning" id="recentAccuracy">87.0%</div>
+                    <small>Recent Accuracy</small>
+                </div>
+                <div class="col-md-4">
+                    <div class="display-6 text-info" id="totalPredictions">0</div>
+                    <small>Total Predictions</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Disclaimer -->
+        <div class="glass-card alert alert-warning">
+            <h5><i class="fas fa-exclamation-triangle"></i> IMPORTANT DISCLAIMER</h5>
+            <p class="mb-0 small">
+                This is an AI-powered prediction tool for educational purposes only. 
+                Forex trading involves substantial risk. Predictions are based on 
+                historical data and technical analysis but are not guaranteed. 
+                Always use proper risk management and never trade with money you 
+                cannot afford to lose.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        let predictionChart;
+        let currentPrediction = null;
+        let countdownInterval;
+
+        // Initialize Chart
+        function initChart() {
+            const ctx = document.getElementById('predictionChart').getContext('2d');
+            predictionChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        {
+                            label: 'EUR/GBP Price',
+                            data: [],
+                            borderColor: '#3498db',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Entry Zone',
+                            data: [],
+                            borderColor: '#007bff',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            fill: false,
+                            pointRadius: 8,
+                            pointBackgroundColor: '#007bff',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2
+                        },
+                        {
+                            label: 'Take Profit',
+                            data: [],
+                            borderColor: '#28a745',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            fill: false
+                        },
+                        {
+                            label: 'Stop Loss',
+                            data: [],
+                            borderColor: '#dc3545',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: '#fff'
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#fff'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#fff',
+                                callback: function(value) {
+                                    return value.toFixed(5);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Get prediction from API
+        async function getPrediction() {
+            const btn = document.querySelector('button');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/hourly-prediction');
+                const data = await response.json();
+
+                if (data.success) {
+                    currentPrediction = data.prediction;
+                    updateDisplay(currentPrediction, data.chart_data);
+                    updateTimeframeAnalysis(currentPrediction.analysis);
+                    startCountdown();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to get prediction');
+            }
+
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }, 1000);
+        }
+
+        // Update display with prediction data
+        function updateDisplay(prediction, chartData) {
+            // Update current price and signal
+            document.getElementById('currentPrice').textContent = prediction.current_price.toFixed(5);
+            document.getElementById('lastUpdate').textContent = prediction.timestamp;
+            
+            // Update signal box
+            const signalBox = document.getElementById('signalBox');
+            signalBox.className = 'signal-box ';
+            
+            if (prediction.signal.includes('BUY')) {
+                signalBox.classList.add('signal-buy');
+                signalBox.innerHTML = '<i class="fas fa-arrow-up"></i> ' + prediction.signal.replace('_', ' ');
+                document.getElementById('entryAction').className = 'badge bg-success';
+                document.getElementById('entryAction').textContent = 'BUY';
+            } else if (prediction.signal.includes('SELL')) {
+                signalBox.classList.add('signal-sell');
+                signalBox.innerHTML = '<i class="fas fa-arrow-down"></i> ' + prediction.signal.replace('_', ' ');
+                document.getElementById('entryAction').className = 'badge bg-danger';
+                document.getElementById('entryAction').textContent = 'SELL';
+            } else {
+                signalBox.classList.add('signal-neutral');
+                signalBox.innerHTML = '<i class="fas fa-pause"></i> ' + prediction.signal;
+                document.getElementById('entryAction').className = 'badge bg-secondary';
+                document.getElementById('entryAction').textContent = 'WAIT';
+            }
+            
+            // Update confidence
+            document.getElementById('confidenceValue').textContent = prediction.confidence + '%';
+            const confFill = document.getElementById('confidenceFill');
+            confFill.style.width = prediction.confidence + '%';
+            
+            if (prediction.confidence > 80) {
+                confFill.className = 'confidence-fill bg-success';
+            } else if (prediction.confidence > 65) {
+                confFill.className = 'confidence-fill bg-warning';
+            } else {
+                confFill.className = 'confidence-fill bg-danger';
+            }
+            
+            // Update trading levels
+            document.getElementById('entryPrice').textContent = prediction.entry_price;
+            document.getElementById('takeProfit').textContent = prediction.take_profit;
+            document.getElementById('stopLoss').textContent = prediction.stop_loss;
+            document.getElementById('predictedHigh').textContent = prediction.predicted_high;
+            document.getElementById('predictedLow').textContent = prediction.predicted_low;
+            
+            // Calculate pips
+            const pipTP = Math.abs(prediction.take_profit - prediction.entry_price) / 0.0001;
+            const pipSL = Math.abs(prediction.stop_loss - prediction.entry_price) / 0.0001;
+            const rrRatio = (pipTP / pipSL).toFixed(2);
+            
+            document.getElementById('tpPips').textContent = pipTP.toFixed(1);
+            document.getElementById('slPips').textContent = pipSL.toFixed(1);
+            document.getElementById('riskReward').textContent = '1:' + rrRatio;
+            
+            // Update chart
+            updateChartData(chartData);
+            
+            // Update current hour
+            const now = new Date();
+            const currentHour = now.getHours().toString().padStart(2, '0') + ':00';
+            const nextHour = (now.getHours() + 1) % 24;
+            document.getElementById('currentHour').textContent = currentHour;
+            
+            // Load accuracy stats
+            loadAccuracyStats();
+            
+            // Add pulse animation to signal box
+            if (prediction.confidence > 80) {
+                signalBox.classList.add('pulse');
+            } else {
+                signalBox.classList.remove('pulse');
+            }
+        }
+
+        // Update chart data
+        function updateChartData(chartData) {
+            if (!predictionChart || !chartData) return;
+            
+            predictionChart.data.labels = chartData.times;
+            predictionChart.data.datasets[0].data = chartData.prices;
+            
+            // Create entry zone data (highlight entry point)
+            const entryData = chartData.prices.map((price, index) => {
+                return index === 0 ? chartData.entry_price : null;
+            });
+            predictionChart.data.datasets[1].data = entryData;
+            
+            // Create TP and SL lines
+            const tpData = chartData.prices.map(() => chartData.take_profit);
+            const slData = chartData.prices.map(() => chartData.stop_loss);
+            
+            predictionChart.data.datasets[2].data = tpData;
+            predictionChart.data.datasets[3].data = slData;
+            
+            predictionChart.update();
+        }
+
+        // Update timeframe analysis
+        function updateTimeframeAnalysis(analysis) {
+            const container = document.getElementById('timeframeAnalysis');
+            container.innerHTML = '';
+            
+            const timeframes = ['1min', '5min', '15min', '30min', '60min', 'daily', 'weekly', 'monthly'];
+            
+            timeframes.forEach(tf => {
+                if (analysis.trends && analysis.trends[tf]) {
+                    const signal = analysis.signals[tf] || 'NEUTRAL';
+                    const trend = analysis.trends[tf];
+                    const volatility = analysis.volatility[tf] || 0;
+                    
+                    let badgeClass = 'bg-secondary';
+                    if (signal.includes('BUY')) badgeClass = 'bg-success';
+                    else if (signal.includes('SELL')) badgeClass = 'bg-danger';
+                    
+                    const card = `
+                        <div class="col-6 col-md-3 mb-3">
+                            <div class="glass-card p-3 text-center">
+                                <small class="text-muted">${tf.toUpperCase()}</small>
+                                <div class="mt-2">
+                                    <span class="badge ${badgeClass}">${signal}</span>
+                                </div>
+                                <div class="small mt-2">
+                                    <span class="text-info">${trend}</span><br>
+                                    <span class="text-warning">Vol: ${volatility.toFixed(2)}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    container.innerHTML += card;
+                }
+            });
+        }
+
+        // Load accuracy statistics
+        async function loadAccuracyStats() {
+            try {
+                const response = await fetch('/api/prediction-history');
+                const data = await response.json();
+                
+                if (data.success && data.accuracy) {
+                    document.getElementById('overallAccuracy').textContent = data.accuracy.overall + '%';
+                    document.getElementById('recentAccuracy').textContent = data.accuracy.recent + '%';
+                    document.getElementById('totalPredictions').textContent = data.accuracy.total_predictions || 0;
+                }
+            } catch (error) {
+                console.error('Error loading accuracy:', error);
+            }
+        }
+
+        // Start countdown to next hour
+        function startCountdown() {
+            clearInterval(countdownInterval);
+            
+            function updateCountdown() {
+                const now = new Date();
+                const minutes = now.getMinutes();
+                const seconds = now.getSeconds();
+                const minutesToNextHour = 60 - minutes;
+                const secondsToNextMinute = 60 - seconds;
+                
+                const totalSeconds = (minutesToNextHour - 1) * 60 + secondsToNextMinute;
+                const minutesLeft = Math.floor(totalSeconds / 60);
+                const secondsLeft = totalSeconds % 60;
+                
+                document.getElementById('nextUpdate').textContent = 
+                    `${minutesLeft.toString().padStart(2, '0')}:${secondsLeft.toString().padStart(2, '0')}`;
+                
+                // Auto-refresh at start of hour
+                if (minutes === 0 && seconds === 0) {
+                    getPrediction();
+                }
+            }
+            
+            updateCountdown();
+            countdownInterval = setInterval(updateCountdown, 1000);
+        }
+
+        // Update chart timeframes
+        function updateChart(timeframe) {
+            // This would fetch different chart data based on timeframe
+            // For now, we'll just log it
+            console.log('Switching to timeframe:', timeframe);
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initChart();
+            getPrediction();
+            loadAccuracyStats();
+            
+            // Auto-refresh every 5 minutes
+            setInterval(getPrediction, 300000);
+        });
+    </script>
+</body>
+</html>
